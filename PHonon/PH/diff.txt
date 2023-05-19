@@ -1,0 +1,120 @@
+190,191c190,191
+<      nbroad = 1 ! number of broagdenings for which the a2F(w) will be calculated
+<      minbroad = 5 ! minimum broadening in cm-1
+---
+>      nbroad = 1 
+>      minbroad = 5
+418c418,419
+<      IF (xmlifc) CALL set_sym(nat, tau, ityp, nspin_mag, m_loc, 6, 6, 6 )
+---
+> !     IF (xmlifc) CALL set_sym(nat, tau, ityp, nspin_mag, m_loc, 6, 6, 6 )
+>      IF (xmlifc) CALL set_sym(nat, tau, ityp, nspin_mag, m_loc )
+541,542c542
+< !        call diag_dynmat(dyn_mat,w2,z) 
+<         call cdiagh2(3*nat,dyn_mat,3*nat,w2,z)
+---
+>         call diag_dynmat(dyn_mat,w2,z) 
+697c697
+<        print '(a,f6.3,a)','* Broadening ', dble(i) * minbroad, ' [cm-1]' 
+---
+>        print *,'* Broadening ', i, ' [cm-1]' 
+789,792c789,792
+<     file_a2F = 'a2F.'//trim(int_to_char(intbroad))//'.dat'
+<     file_lambda = 'lambda_int.'//trim(int_to_char(intbroad))//'.dat'
+<     file_pdos = 'pdos..'//trim(int_to_char(intbroad))//'.dat'
+<     
+---
+>     file_a2F='a2F.'//trim(int_to_char(intbroad))//'.dat'
+>     file_lambda='lambda_int.'//trim(int_to_char(intbroad))//'.dat'
+>     file_pdos='pdos.'//trim(int_to_char(intbroad))//'.dat'
+> 
+831c831
+<       omega2_vector(i) =  a2F(i) * w_vector(i)
+---
+>       omega2_vector =  a2F(i) * w_vector(i)   
+886c886
+<       print '(a,f6.3,a,f8.3)', '     mustar -> ', mustar, ', Tc [K] = ', omega_log * rydk * &
+---
+>       print '(a,f6.3,a,f6.3)', '     mustar -> ', mustar, ', Tc [K] = ', omega_log * rydk * &
+894c894
+<       mustar = 0.07d0 + dble(i-1) / (200.0d0) 
+---
+>       mustar = 0.07d0 + dble(i-1) / (200.0d0)
+902c902
+<     end do
+---
+>     end do    
+939c939
+<         file_a2F ='a2Fpartial_'//trim(int_to_char(i))//'_'//trim(int_to_char(j))//'.'//trim(int_to_char(intbroad))//'.dat' 
+---
+>         file_a2F ='a2Fpartial_'//trim(int_to_char(i))//'_'//trim(int_to_char(j))//'.'//trim(int_to_char(intbroad))//'.dat'
+941c941
+< !          write (file_a2F, fmt='(a,i1,a,i1,a,i1,a)') 'a2Fpartial_', i, '_', j, '.', intbroad, '.dat'       
+---
+> !          write (file_a2F, fmt='(a,i1,a,i1,a,i1,a)') 'a2Fpartial_', i, '_', j, '.', intbroad, '.dat'
+943c943
+< !          write (file_a2F, fmt='(a,i1,a,i1,a,i2,a)') 'a2Fpartial_', i, '_', j, '.', intbroad, '.dat'       
+---
+> !          write (file_a2F, fmt='(a,i1,a,i1,a,i2,a)') 'a2Fpartial_', i, '_', j, '.', intbroad, '.dat'
+993a994
+> 
+996,999c997,1000
+< !      if (intbroad .lt. 10) then 
+< !        write (file_a2F, fmt='(a,i1,a,i1,a)') 'pdospartial_', i, '.', intbroad, '.dat'     
+< !      else 
+< !        write (file_a2F, fmt='(a,i1,a,i2,a)') 'pdospartial_', i, '.', intbroad, '.dat'     
+---
+> !      if (intbroad .lt. 10) then
+> !        write (file_a2F, fmt='(a,i1,a,i1,a)') 'pdospartial_', i, '.', intbroad, '.dat'
+> !      else
+> !        write (file_a2F, fmt='(a,i1,a,i2,a)') 'pdospartial_', i, '.', intbroad, '.dat'
+1002,1005c1003,1006
+<       write (unit=1, fmt=*) '# Broadening: ', intbroad, ' [cm-1]' 
+<       write (unit=1, fmt=*) '#    w [Ry]          PDOS ' 
+<       do iw = 1, 10000 
+<         write (unit=1,fmt=*)  w_vector(iw) , pdospartial(iw,i)   
+---
+>       write (unit=1, fmt=*) '# Broadening: ', intbroad, ' [cm-1]'
+>       write (unit=1, fmt=*) '#    w [Ry]          PDOS '
+>       do iw = 1, 10000
+>         write (unit=1,fmt=*)  w_vector(iw) , pdospartial(iw,i)
+1007,1008c1008,1009
+<       close (unit=1) 
+<     end do 
+---
+>       close (unit=1)
+>     end do    
+1137c1138
+<     integer :: nat, info, lwork
+---
+>     integer :: nat, info
+1142,1143d1142
+< 
+<     lwork = 2*3*nat - 1
+1146,1147c1145,1146
+<     allocate(work(lwork))
+<     allocate(rwork(3*3*nat-2))
+---
+>     allocate(work(64*3*nat))
+>     allocate(rwork(64*3*nat))
+1152c1151
+<                 lwork,rwork,info)
+---
+>                 64*3*nat,rwork,info)
+1308c1307
+< !        read(1,'(a)') symm_type
+---
+>         read(1,'(a)') symm_type
+1428,1430c1427,1429
+<         DO n1=-3*nr1,3*nr1
+<            DO n2=-3*nr2,3*nr2
+<               DO n3=-3*nr3,3*nr3
+---
+>         DO n1=-2*nr1,2*nr1
+>            DO n2=-2*nr2,2*nr2
+>               DO n3=-2*nr3,2*nr3
+2460c2459,2460
+<   CALL find_sym ( nat, tau, ityp, 6, 6, 6, .not.time_reversal, mdum )
+---
+> !  CALL find_sym ( nat, tau, ityp, 6, 6, 6, .not.time_reversal, mdum )
+>   CALL find_sym ( nat, tau, ityp, .not.time_reversal, mdum )

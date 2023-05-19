@@ -1,0 +1,399 @@
+80,82c80,81
+<   !               are the eigenvectors divided by the mass and then normalized.
+<   !               As such they are not orthogonal.
+<   !              
+---
+>   !               are the eigenvectors divided by the square root of the mass,
+>   !               then normalized. As such they are not orthogonal.
+85,86c84,85
+<   !               matrix.
+<   !     fldyn     output file for dynamical matrix (default: ' ' i.e. does not write)
+---
+>   !               matrix. They are orthogonal.
+>   !     fldyn     output file for dynamical matrix (default: ' ' i.e. not written)
+112a112,113
+>   !     nosym      if .true., no symmetry and no time reversal are imposed
+>   !     loto_2d    set to .true. to activate two-dimensional treatment of LO-TO splitting.
+145a147
+>   USE rigid,       ONLY: dyndiag, nonanal, nonanal_ifc
+157c159
+<   INTEGER, PARAMETER:: ntypx=10, nrwsx=200
+---
+>   INTEGER, PARAMETER:: ntypx=10, nrwsx=400
+159,160c161,163
+<   INTEGER :: nr1, nr2, nr3, nsc, nk1, nk2, nk3, ntetra, ibrav
+<   CHARACTER(LEN=256) :: flfrc, flfrq, flvec, fltau, fldos, filename, fldyn, fleig
+---
+>   INTEGER :: nr1, nr2, nr3, nsc, nk1, nk2, nk3, ibrav
+>   CHARACTER(LEN=256) :: flfrc, flfrq, flvec, fltau, fldos, filename, fldyn, &
+>                         fleig, fildyn, fildyn_prefix
+165,166c168,170
+<   REAL(DP), ALLOCATABLE:: tau(:,:), q(:,:), w2(:,:), freq(:,:), wq(:)
+<   INTEGER, ALLOCATABLE:: tetra(:,:), ityp(:), itau_blk(:)
+---
+>   REAL(DP), ALLOCATABLE:: tau(:,:), q(:,:), w2(:,:), freq(:,:), wq(:), &
+>           dynq(:,:,:), DOSofE(:)
+>   INTEGER, ALLOCATABLE:: ityp(:), itau_blk(:)
+183c187
+<   LOGICAL :: readtau, la2F, xmlifc, lo_to_split, na_ifc, fd
+---
+>   LOGICAL :: readtau, la2F, xmlifc, lo_to_split, na_ifc, fd, nosym,  loto_2d 
+185c189
+<   REAL(DP) :: qhat(3), qh, DeltaE, Emin=0._dp, Emax, E, DOSofE(1), qq
+---
+>   REAL(DP) :: qhat(3), qh, DeltaE, Emin=0._dp, Emax, E, qq
+191d194
+<   CHARACTER(LEN=15), ALLOCATABLE :: name_rap_mode(:)
+209a213,214
+>   REAL(DP), external       :: dos_gam
+>   !
+213c218,219
+<        &           eigen_similarity, fldyn, na_ifc, fd, point_label_type
+---
+>        &           eigen_similarity, fldyn, na_ifc, fd, point_label_type, &
+>        &           nosym, loto_2d, fildyn, fildyn_prefix
+238a245,246
+>      fildyn = ' '
+>      fildyn_prefix = ' '
+252a261,262
+>      nosym = .false.
+>      loto_2d=.false.
+256c266
+<      CALL mp_bcast(ios, ionode_id, world_comm) 
+---
+>      CALL mp_bcast(ios, ionode_id, world_comm)
+272a283,284
+>      CALL mp_bcast(fildyn,ionode_id, world_comm)
+>      CALL mp_bcast(fildyn_prefix,ionode_id, world_comm)
+282c294
+<      CALL mp_bcast(la2f,ionode_id, world_comm)
+---
+>      CALL mp_bcast(la2F,ionode_id, world_comm)
+286a299
+>      CALL mp_bcast(loto_2d,ionode_id, world_comm) 
+290a304,311
+>      IF ( trim( fildyn ) /= ' ' ) THEN
+>         IF (ionode) THEN
+>            WRITE(stdout, *)
+>            WRITE(stdout, '(4x,a)') ' fildyn has been provided, running q2r...'
+>         END IF
+>         CALL do_q2r(fildyn, flfrc, fildyn_prefix, asr, la2F, loto_2d)
+>      END IF
+>      !
+312d332
+<         print*,'alat', alat
+395d414
+<         ntetra = 6 * nk1 * nk2 * nk3
+397c416
+<         ALLOCATE ( tetra(4,ntetra), q(3,nqx) )
+---
+>         ALLOCATE ( q(3,nqx), wq(nqx) )
+399c418
+<              ntetra, nqx, nq, q, tetra)
+---
+>              nqx, nq, q, nosym, wq)
+407d425
+<         ALLOCATE( tetra(1,1) )
+408a427
+>            ALLOCATE(wq(nq))
+517c536,537
+<      ALLOCATE ( z(3*nat,3*nat), w2(3*nat,nq), f_of_q(3,3,nat,nat) )
+---
+>      ALLOCATE ( z(3*nat,3*nat), w2(3*nat,nq), f_of_q(3,3,nat,nat), &
+>                 dynq(3*nat,nq,nat), DOSofE(nat) )
+521c541
+<      IF (xmlifc) CALL set_sym(nat, tau, ityp, nspin_mag, m_loc, 6, 6, 6 )
+---
+>      IF (xmlifc) CALL set_sym(nat, tau, ityp, nspin_mag, m_loc )
+532c552
+<         f_of_q(:,:,:,:)=CMPLX(0.d0,0.d0)
+---
+>         f_of_q(:,:,:,:) = (0.d0,0.d0)
+536,537c556,557
+<            qq=sqrt(q(1,n)**2+q(2,n)**2+q(3,n)**3)
+<            if(qq == 0.0) qq=1.0
+---
+>            qq=sqrt(q(1,n)**2+q(2,n)**2+q(3,n)**2)
+>            if(abs(qq) < 1d-8) qq=1.0
+547a568
+>                    loto_2d, &
+549c570
+< 
+---
+>         IF (.not.loto_2d) THEN 
+594a616,621
+>         END IF 
+> 
+>         if(iout_dyn.ne.0) THEN
+>            call write_dyn_on_file(q(1,n),dyn,nat, iout_dyn)
+>            if(sum(abs(q(:,n)))==0._dp) call  write_epsilon_and_zeu (zeu, epsil, nat, iout_dyn)
+>         endif
+596,597d622
+<         if(iout_dyn.ne.0) call write_dyn_on_file(q(1,n),dyn,nat, iout_dyn)
+<         
+599a625,632
+>         ! Atom projection of dynamical matrix
+>         DO i = 1, 3*nat
+>            DO na = 1, nat
+>               dynq(i, n, na) = DOT_PRODUCT(z(3*(na-1)+1:3*na, i), &
+>               &                            z(3*(na-1)+1:3*na, i)  ) &
+>               &              * amu_ry * amass(ityp(na))
+>            END DO
+>         END DO
+607d639
+<              ALLOCATE(name_rap_mode(3*nat))
+610,611c642
+<                        w2(:,n),z,tau,ityp,amass,name_rap_mode, &
+<                        num_rap_mode(:,n), nspin_mag)
+---
+>                        w2(:,n),z,tau,ityp,amass, num_rap_mode(:,n), nspin_mag)
+614d644
+<             DEALLOCATE(name_rap_mode)
+715a746,749
+>         IF (ionode) WRITE (2, *) "# Frequency[cm^-1] DOS PDOS"
+>         DO na = 1, nat
+>            dynq(1:3*nat,1:nq,na) = dynq(1:3*nat,1:nq,na) * freq(1:3*nat,1:nq)
+>         END DO
+718c752,758
+<            CALL dos_t(freq, 1, 3*nat, nq, ntetra, tetra, E, DOSofE)
+---
+>            DO na = 1, nat
+>               DOSofE(na) = 0d0
+>               DO i = 1, 3*nat
+>                  DOSofE(na) = DOSofE(na) &
+>                  & + dos_gam(3*nat, nq, i, dynq(1:3*nat,1:nq,na), freq, E)
+>               END DO
+>            END DO
+720,725c760
+<            ! The factor 0.5 corrects for the factor 2 in dos_t,
+<            ! that accounts for the spin in the electron DOS.
+<            !
+<            !WRITE (2, '(F15.10,F15.2,F15.6,F20.5)') &
+<            !     E, E*RY_TO_CMM1, E*RY_TO_THZ, 0.5d0*DOSofE(1)
+<            IF (ionode) WRITE (2, '(ES12.4,ES12.4)') E, 0.5d0*DOSofE(1)
+---
+>            IF (ionode) WRITE (2, '(2ES18.10,1000ES12.4)') E, SUM(DOSofE(1:nat)), DOSofE(1:nat)
+752c787
+<                            ntetra, tetra, asr, q, freq,fd)
+---
+>                            asr, q, freq,fd, wq)
+914c949
+<   INTEGER nr1, nr2, nr3, nat, n1, n2, n3, &
+---
+>   INTEGER nr1, nr2, nr3, nat, n1, n2, n3, nr1_, nr2_, nr3_, &
+925a961,963
+>   nr1_=3*nr1
+>   nr2_=3*nr2
+>   nr3_=3*nr3
+928c966
+<     ALLOCATE( wscache(-2*nr3:2*nr3, -2*nr2:2*nr2, -2*nr1:2*nr1, nat,nat) )
+---
+>     ALLOCATE( wscache(-nr3_:nr3_, -nr2_:nr2_, -nr1_:nr1_, nat,nat) )
+933,935c971,975
+<           DO n1=-2*nr1,2*nr1
+<              DO n2=-2*nr2,2*nr2
+<                 DO n3=-2*nr3,2*nr3
+---
+>           ! SUM OVER R VECTORS IN THE SUPERCELL - VERY VERY VERY SAFE RANGE!
+>           !
+>           DO n1=-nr1_,nr1_
+>              DO n2=-nr2_,nr2_
+>                 DO n3=-nr3_,nr3_
+941a982
+>                    total_weight=total_weight + wscache(n3,n2,n1,nb,na) 
+944a986,989
+>           IF (ABS(total_weight-nr1*nr2*nr3).GT.1.0d-8) THEN
+>              WRITE(stdout,*) na,nb,total_weight
+>              CALL errore ('frc_blk','wrong total_weight',1)
+>           END IF
+955,958c1000,1002
+<         total_weight=0.0d0
+<         DO n1=-2*nr1,2*nr1
+<            DO n2=-2*nr2,2*nr2
+<               DO n3=-2*nr3,2*nr3
+---
+>         DO n1=-nr1_,nr1_
+>            DO n2=-nr2_,nr2_
+>               DO n3=-nr3_,nr3_
+989,991c1033,1034
+<                           dyn(ipol,jpol,na,nb) =                 &
+<                                dyn(ipol,jpol,na,nb) +            &
+<                                (frc(m1,m2,m3,ipol,jpol,na,nb)+f_of_q(ipol,jpol,na,nb))     &
+---
+>                           dyn(ipol,jpol,na,nb) = dyn(ipol,jpol,na,nb) +                &
+>                                (frc(m1,m2,m3,ipol,jpol,na,nb)+f_of_q(ipol,jpol,na,nb)) &
+994a1038
+> 
+996d1039
+<                  total_weight=total_weight + weight
+1000,1003d1042
+<         IF (ABS(total_weight-nr1*nr2*nr3).GT.1.0d-8) THEN
+<            WRITE(stdout,*) total_weight
+<            CALL errore ('frc_blk','wrong total_weight',1)
+<         END IF
+1007,1029d1045
+< !  alat=10.2
+< !  nax=0
+< !  DO n1=1,nr1
+< !     DO n2=1,nr2
+< !        DO n3=1,nr3
+< !           do na=1,nat
+< !              nax=nax+1
+< !              do i=1,3
+< !                 tttx(i,nax)=ttt(i,na,n1,n2,n3)*alat*0.529177
+< !              end do
+< !           end do
+< !        end do
+< !     end do
+< !  end do
+< !
+< !  do nb=1,nat
+< !     write(6,'(3(f15.9,1x))') tau(1,nb),tau(2,nb),tau(3,nb)
+< !  enddo
+< !  print*, '========='
+< !  do nb=1,nat*nr1*nr2*nr3
+< !     write(6,'(3(f15.9,1x))') tttx(1,nb),tttx(2,nb),tttx(3,nb)
+< !  enddo
+< ! 
+1036c1052,1053
+<      &                 epsil,zeu,frc,nr1,nr2,nr3,has_zstar,rws,nrws,na_ifc,f_of_q,fd)
+---
+>      &         loto_2d, & 
+>      &         epsil,zeu,frc,nr1,nr2,nr3,has_zstar,rws,nrws,na_ifc,f_of_q,fd)
+1041a1059,1060
+>   USE cell_base,  ONLY : celldm
+>   USE rigid,      ONLY : rgd_blk
+1054c1073
+<   LOGICAL :: has_zstar, na_ifc, fd
+---
+>   LOGICAL :: has_zstar, na_ifc, fd, loto_2d 
+1077c1096,1097
+<                         epsil,zeu,bg_blk,omega_blk,+1.d0)
+---
+>                          epsil,zeu,bg_blk,omega_blk,celldm(1), loto_2d,+1.d0)
+>            ! LOTO 2D added celldm(1)=alat to passed arguments
+1211d1230
+< 
+1987c2006
+<      ntetra, nqx, nq, q, tetra)
+---
+>      nqx, nq, q, nosym, wk)
+1993a2013
+>   USE ktetra,     ONLY : tetra_init
+1997c2017
+<   INTEGER :: ibrav, nat, nk1, nk2, nk3, ntetra, ityp(*)
+---
+>   INTEGER :: ibrav, nat, nk1, nk2, nk3, ityp(*)
+1998a2019
+>   LOGICAL :: nosym
+2000,2001c2021,2022
+<   INTEGER :: nqx, nq, tetra(4,ntetra)
+<   REAL(DP) :: q(3,nqx)
+---
+>   INTEGER :: nqx, nq
+>   REAL(DP) :: q(3,nqx), wk(nqx)
+2003c2024
+<   REAL(DP) :: xqq(3), wk(nqx), mdum(3,nat)
+---
+>   REAL(DP) :: xqq(3), mdum(3,nat)
+2006a2028
+>   if (nosym) time_reversal = .false.
+2012a2035,2038
+>   if (nosym) then
+>      nrot = 1
+>      nsym = 1
+>   endif
+2016c2042
+<   CALL find_sym ( nat, tau, ityp, 6, 6, 6, .not.time_reversal, mdum )
+---
+>   CALL find_sym ( nat, tau, ityp, .not.time_reversal, mdum )
+2021,2022c2047,2048
+<   IF (ntetra /= 6 * nk1 * nk2 * nk3) &
+<        CALL errore ('gen_qpoints','inconsistent ntetra',1)
+---
+>   CALL tetra_init (nsym, s, time_reversal, t_rev, at, bg, nqx, 0, 0, 0, &
+>        nk1, nk2, nk3, nq, q)
+2024,2026d2049
+<   CALL tetrahedra (nsym, s, time_reversal, t_rev, at, bg, nqx, 0, 0, 0, &
+<        nk1, nk2, nk3, nq, q, wk, ntetra, tetra)
+<   !
+2034c2057
+<      dos, Emin, DeltaE, ndos, ntetra, tetra, asr, q, freq,fd )
+---
+>      dos, Emin, DeltaE, ndos, asr, q, freq,fd, wq )
+2043a2067
+>   USE constants, ONLY : K_BOLTZMANN_RY
+2047,2048c2071
+<   INTEGER, INTENT(in) :: nat, nq, nr1, nr2, nr3, ibrav, ndos, ntetra, &
+<        tetra(4, ntetra)
+---
+>   INTEGER, INTENT(in) :: nat, nq, nr1, nr2, nr3, ibrav, ndos
+2051c2074
+<   REAL(DP), INTENT(in) :: freq(3*nat,nq), q(3,nq), at(3,3), bg(3,3), &
+---
+>   REAL(DP), INTENT(in) :: freq(3*nat,nq), q(3,nq), wq(nq), at(3,3), bg(3,3), &
+2191,2192c2214
+<               dos_a2F(j) = dos_gam(nmodes, nq, j, ntetra, tetra, &
+<                                    gamma, freq, E)
+---
+>               dos_a2F(j) = dos_gam(nmodes, nq, j, gamma, freq, E)
+2198,2199c2220
+<            write (ifn, '(3X,2F12.6)') E, dos_tot
+<            write (ifn, '(6F16.8)') (dos_a2F(j),j=1,nmodes)
+---
+>            write (ifn, '(3X,1000E16.6)') E, dos_tot, dos_a2F(1:nmodes)
+2203,2204c2224,2241
+<         write(400,'(" Broadening ",F8.4," lambda ",F12.4," dos(Ef)",F8.4)') &
+<              deg(isig),lambda, dos_ee(isig)
+---
+>         !
+>         ! lambda from alternative way, simple sum.
+>         ! Also Omega_ln is computed
+>         !
+>         lambda = 0.0_dp
+>         E = 0.0_dp
+>         do n = 1, nq
+>            lambda = lambda &
+>            &      + sum(gamma(1:nmodes,n)/freq(1:nmodes,n)**2, &
+>            &             freq(1:nmodes,n) > 1.0e-5_dp) * wq(n)
+>            E = E &
+>            & + sum(log(freq(1:nmodes,n)) * gamma(1:nmodes,n)/freq(1:nmodes,n)**2, &
+>            &             freq(1:nmodes,n) > 1.0e-5_dp) * wq(n)
+>         end do
+>         E = exp(E / lambda) / K_BOLTZMANN_RY
+>         lambda = lambda / (dos_ee(isig) * pi)
+>         write(400,'(" Broadening ",F8.4," lambda ",F12.4," dos(Ef)",F8.4," omega_ln [K]",F12.4)') &
+>              deg(isig),lambda, dos_ee(isig), E
+2318c2355
+< function dos_gam (nbndx, nq, jbnd, ntetra, tetra, gamma, et, ef)
+---
+> function dos_gam (nbndx, nq, jbnd, gamma, et, ef)
+2327,2328c2364,2365
+<   use parameters
+< !  USE ifconstants, ONLY : gamma
+---
+>   USE parameters
+>   USE ktetra, ONLY : ntetra, tetra
+2331c2368
+<   integer :: nq, nbndx, ntetra, tetra(4,ntetra), jbnd
+---
+>   integer :: nq, nbndx, jbnd
+2495c2532
+<                   amass, name_rap_mode, num_rap_mode, nspin_mag )
+---
+>                   amass, num_rap_mode, nspin_mag )
+2499,2501c2536,2537
+<   USE symm_base,  ONLY : find_sym, s, sr, ftau, irt, nsym, &
+<                          nrot, t_rev, time_reversal, sname, copy_sym, &
+<                          s_axis_to_cart
+---
+>   USE symm_base,  ONLY : s, sr, ftau, irt, nsym, nrot, t_rev, time_reversal,&
+>                          sname, copy_sym, s_axis_to_cart
+2509d2544
+<   CHARACTER(15), INTENT(OUT) :: name_rap_mode(3*nat)
+2545,2546c2580,2581
+<      CALL sgam_ph_new (at, bg, nsym, s, irt, tau, rtau, nat)
+<      CALL find_mode_sym_new (u, w2, tau, nat, nsymq, sr, irt, xq,    &
+---
+>      CALL sgam_lr (at, bg, nsym, s, irt, tau, rtau, nat)
+>      CALL find_mode_sym_new (u, w2, tau, nat, nsymq, s, sr, irt, xq,    &
